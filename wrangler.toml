@@ -1,0 +1,8 @@
+name = "remote-tasks"
+main = "worker/index.ts"
+compatibility_date = "2024-11-27"
+
+[[d1_databases]]
+binding = "D1"
+database_name = "remote-tasks"
+database_id = "00000000-0000-0000-0000-000000000000"  # Update this to your database ID

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "worker": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URL of the cloudflare worker"
+    },
+    "preTask": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "description": "Commands to execute before each task"
+    },
+    "defaultTag": {
+      "type": "string",
+      "description": "Default tag for 'add' and 'run' commands"
+    }
+  },
+  "required": ["worker"]
+}

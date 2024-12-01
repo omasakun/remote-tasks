@@ -1,0 +1,56 @@
+{
+  "name": "remote-tasks",
+  "version": "0.1.0",
+  "description": "A simple way to execute tasks on remote machines",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omasakun/remote-tasks.git"
+  },
+  "author": "omasakun",
+  "license": "MPL-2.0",
+  "type": "module",
+  "packageManager": "pnpm@9.13.2",
+  "scripts": {
+    "prepare": "husky",
+    "prepublish": "npm run build",
+    "build": "tsc",
+    "dev": "npm run build && node dist/index.js",
+    "dev-worker": "wrangler dev"
+  },
+  "bin": {
+    "remote-tasks": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "schema.json"
+  ],
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "execa": "^9.5.1",
+    "node-fetch": "^3.3.2",
+    "prompts": "^2.4.2",
+    "strip-json-comments": "^5.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241127.0",
+    "@tsconfig/node22": "^22.0.0",
+    "@types/prompts": "^2.4.9",
+    "ensure-license-notice": "^0.1.1",
+    "husky": "^9.1.7",
+    "itty-router": "^5.0.18",
+    "lint-staged": "^15.2.10",
+    "prettier": "^3.2.4",
+    "typescript": "^5.0.4",
+    "wrangler": "^3.32.0"
+  },
+  "lint-staged": {
+    "*": [
+      "ensure-license-notice"
+    ],
+    "*.{json,ts}": [
+      "prettier --write"
+    ]
+  }
+}

@@ -1,5 +1,8 @@
+dist/
+
 # auto generated
 .pnpm-store/
+.wrangler/
 node_modules/
 
 /package-lock.json

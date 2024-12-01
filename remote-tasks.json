@@ -1,0 +1,6 @@
+{
+  "$schema": "./schema.json",
+  "worker": "http://localhost:8787",
+  "preTask": ["echo 'Hello!'", ["echo", "'Hello!'"]],
+  "defaultTag": "default"
+}
