@@ -327,7 +327,11 @@ program
       ids.map(async (id) => {
         const task = await client.getTaskById(Number(id))
         task.status = 'pending'
-        task.task = JSON.stringify({ ...JSON.parse(task.task), lastHeartbeat: null })
+        task.task = JSON.stringify({
+          ...JSON.parse(task.task),
+          exitCode: null,
+          lastHeartbeat: null,
+        })
         await client.updateTask(task)
         console.log('Task requeued with ID:', id)
       }),
@@ -351,6 +355,7 @@ program
     tasks.forEach((task) => {
       const taskData = JSON.parse(task.task)
       const lastHeartbeat = taskData.lastHeartbeat ? new Date(taskData.lastHeartbeat) : null
+      const exitCode = taskData.exitCode ? ` with exit code ${taskData.exitCode}` : ''
       const isStale = lastHeartbeat && Date.now() - lastHeartbeat.getTime() > STALE_THRESHOLD_MS
       const status = isStale ? 'stale' : task.status
       const color =
@@ -359,7 +364,7 @@ program
           running: chalk.blue,
           stale: chalk.yellow,
         }[status] || chalk.gray
-      console.log(color(`#${task.id} [${task.tag}, ${status}]`))
+      console.log(color(`#${task.id} [${task.tag}, ${status}${exitCode}]`))
       console.log(`> ${taskData.command.join(' ')}`)
     })
   })
@@ -456,8 +461,9 @@ program
     }
     if (repeat) {
       while (true) {
-        await runNextTask(tag)
-        await new Promise((resolve) => setTimeout(resolve, RUN_INTERVAL_MS))
+        if (!(await runNextTask(tag))) {
+          await new Promise((resolve) => setTimeout(resolve, RUN_INTERVAL_MS))
+        }
       }
     } else {
       await runNextTask(tag)

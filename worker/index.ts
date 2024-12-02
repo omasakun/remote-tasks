@@ -5,6 +5,7 @@
 
 import { Router } from 'itty-router'
 import { z } from 'zod'
+import indexHtml from './index.html'
 
 interface Env {
   BASIC_PASS: string
@@ -44,6 +45,10 @@ const taskSchema = z.object({
 const logSchema = z.object({
   task_id: z.number(),
   log: z.string(),
+})
+
+router.get('/', async () => {
+  return new Response(indexHtml, { status: 200, headers: { 'Content-Type': 'text/html' } })
 })
 
 router.get('/tags', async (request, env: Env) => {
@@ -126,7 +131,7 @@ router.post('/tasks/start/:tag', async (request, env: Env) => {
 router.get('/tasks/:id', async (request, env: Env) => {
   const { id } = request.params
   const result = await env.D1.prepare('SELECT * FROM tasks WHERE id = ?').bind(id).all()
-  return new Response(JSON.stringify(result.results), { status: 200 })
+  return new Response(JSON.stringify(result.results[0]), { status: 200 })
 })
 
 router.put('/tasks/:id', async (request, env: Env) => {
@@ -185,4 +190,4 @@ export default {
     }
     return router.fetch(request, env, ctx)
   },
-}
+} satisfies ExportedHandler<Env>

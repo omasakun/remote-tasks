@@ -10,6 +10,8 @@ Remote task queue made with Cloudflare Workers & D1 database.
 
 You can schedule tasks to run on remote machines with a simple command line interface.
 
+This project includes a web interface to manage tasks. Open the worker URL in your browser to access it.
+
 ## Usage
 
 ```bash
@@ -36,10 +38,10 @@ npx remote-tasks --help
 Run the following commands to setup the cloudflare worker after cloning the repository.
 
 ```bash
-npm exec wrangler d1 create  remote-tasks  # Update wrangler.toml accordingly
-npm exec wrangler d1 execute remote-tasks --file worker/schema.sql
-npm exec wrangler secret put BASIC_PASS    # Set a password for basic auth
-npm exec wrangler deploy
+npx wrangler d1 create  remote-tasks  # Update wrangler.toml accordingly
+npx wrangler d1 execute remote-tasks --file worker/schema.sql
+npx wrangler secret put BASIC_PASS    # Set a password for basic auth
+npx wrangler deploy
 ```
 
 ## Configuration

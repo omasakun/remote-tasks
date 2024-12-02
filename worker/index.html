@@ -1,0 +1,344 @@
+<!--
+  Copyright 2024 omasakun <omasakun@o137.net>.
+
+  This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+  If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remote Tasks</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&display=swap');
+      body {
+        font-family: 'Inconsolata', monospace;
+        margin: 2rem;
+        background-color: #f0f0f0;
+        color: #333;
+      }
+      h1 {
+        text-align: center;
+        font-size: 2rem;
+      }
+      form {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      input,
+      button,
+      select {
+        font-family: inherit;
+        font-size: 1rem;
+      }
+      #new-task-tag {
+        width: 6rem;
+      }
+      #new-task-command {
+        flex: 1;
+      }
+      #task-list {
+        list-style-type: none;
+        padding: 0;
+      }
+      #task-list li {
+        padding: 1rem;
+        border: 1px solid #ccc;
+        margin-bottom: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        background-color: #fff;
+        flex-direction: column;
+      }
+      #task-list li button {
+        margin-left: 1rem;
+      }
+      .task-header {
+        color: #999;
+      }
+      .task-content {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .task-content div {
+        flex: 1;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .log-container {
+        margin-top: 1rem;
+      }
+      .log-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .log-slider {
+        flex: 1;
+        margin: 0;
+      }
+      .log-terminal {
+        margin-top: 0.5rem;
+        height: 50vh;
+        overflow: hidden;
+        border-radius: 0.25rem;
+      }
+    </style>
+    <link rel="stylesheet" href="https://esm.sh/@xterm/xterm@5.5.0/css/xterm.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "preact": "https://esm.sh/preact@10.25.1",
+          "preact/hooks": "https://esm.sh/preact@10.25.1/hooks",
+          "htm/preact": "https://esm.sh/htm@3.1.1/preact?external=preact",
+          "xterm": "https://esm.sh/@xterm/xterm@5.5.0",
+          "@xterm/addon-fit": "https://esm.sh/@xterm/addon-fit@0.10.0"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { h, render } from 'preact'
+      import { useState, useEffect, useLayoutEffect, useRef } from 'preact/hooks'
+      import { html } from 'htm/preact'
+      import { Terminal } from 'xterm'
+      import { FitAddon } from '@xterm/addon-fit'
+
+      const App = () => {
+        const [tasks, setTasks] = useState([])
+        const [tagSuggestions, setTagSuggestions] = useState([])
+        const [commandSuggestions, setCommandSuggestions] = useState([])
+        const [newTaskTag, setNewTaskTag] = useState('')
+        const [newTaskCommand, setNewTaskCommand] = useState('')
+        const [visibleTerminals, setVisibleTerminals] = useState({})
+        const [logPositions, setLogPositions] = useState({})
+        const [logLengths, setLogLengths] = useState({})
+        const terminals = useRef({})
+
+        useEffect(() => {
+          fetchTasks()
+          window.addEventListener('resize', () => {
+            Object.values(terminals.current).forEach(({ fitAddon }) => fitAddon.fit())
+          })
+        }, [])
+
+        useLayoutEffect(() => {
+          Object.values(terminals.current).forEach(({ fitAddon }) => fitAddon.fit())
+        }, [visibleTerminals])
+
+        const fetchTasks = async () => {
+          const tasksResponse = await fetch('/tasks')
+          const tasks = await tasksResponse.json()
+          const uniqueTags = [...new Set(tasks.map((item) => item.tag))]
+          const uniqueCommands = [
+            ...new Set(tasks.map((item) => JSON.parse(item.task).command.join(' '))),
+          ]
+          setTasks(tasks)
+          setTagSuggestions(uniqueTags)
+          setCommandSuggestions(uniqueCommands)
+        }
+
+        const handleInputChange = (e) => {
+          const { id, value } = e.target
+          if (id === 'new-task-tag') setNewTaskTag(value)
+          if (id === 'new-task-command') setNewTaskCommand(value)
+        }
+
+        const handleSubmit = async (e) => {
+          e.preventDefault()
+          const command = newTaskCommand.split(/\s+/)
+          const task = JSON.stringify({ command, exitCode: null, lastHeartbeat: null })
+          const status = 'pending'
+          await fetch('/tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag: newTaskTag, task, status }),
+          })
+          fetchTasks()
+        }
+
+        const handleRequeue = async (id) => {
+          const taskData = await fetch(`/tasks/${id}`).then((res) => res.json())
+          taskData.status = 'pending'
+          taskData.task = JSON.stringify({
+            ...JSON.parse(taskData.task),
+            exitCode: null,
+            lastHeartbeat: null,
+          })
+          await fetch(`/tasks/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(taskData),
+          })
+          fetchTasks()
+        }
+
+        const handleDelete = async (id) => {
+          await fetch(`/tasks/${id}`, { method: 'DELETE' })
+          fetchTasks()
+        }
+
+        const handleShowLogs = async (id) => {
+          if (!terminals.current[id]) {
+            const terminal = new Terminal({
+              convertEol: true,
+              cursorStyle: 'block',
+              cursorBlink: true,
+              fontFamily: "'Inconsolata', monospace",
+              theme: {
+                // One Half Dark
+                foreground: '#dcdfe4',
+                background: '#282c34',
+                cursor: '#a3b3cc',
+                black: '#282c34',
+                brightBlack: '#282c34',
+                red: '#e06c75',
+                brightRed: '#e06c75',
+                green: '#98c379',
+                brightGreen: '#98c379',
+                yellow: '#e5c07b',
+                brightYellow: '#e5c07b',
+                blue: '#61afef',
+                brightBlue: '#61afef',
+                magenta: '#c678dd',
+                brightMagenta: '#c678dd',
+                cyan: '#56b6c2',
+                brightCyan: '#56b6c2',
+                white: '#dcdfe4',
+                brightWhite: '#dcdfe4',
+              },
+            })
+            const fitAddon = new FitAddon()
+            terminal.loadAddon(fitAddon)
+            terminal.open(document.getElementById(`terminal-${id}`))
+            terminals.current[id] = { terminal, fitAddon }
+          }
+
+          const logs = await fetch(`/logs/${id}`).then((res) => res.json())
+          terminals.current[id].logs = logs.map((log) => JSON.parse(log))
+          const initialPosition = logs.length
+          replayLogs(id, initialPosition)
+          setLogPositions((prev) => ({ ...prev, [id]: initialPosition }))
+          setLogLengths((prev) => ({ ...prev, [id]: logs.length }))
+          setVisibleTerminals((prev) => ({ ...prev, [id]: true }))
+        }
+
+        const replayLogs = (id, position) => {
+          const { terminal, fitAddon } = terminals.current[id]
+          fitAddon.fit()
+          terminal.reset()
+
+          function decodeBase64(data) {
+            var binaryString = atob(data)
+            var bytes = new Uint8Array(binaryString.length)
+            for (var i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            return bytes.buffer
+          }
+
+          const logs = terminals.current[id].logs.slice(0, position)
+          logs.forEach((log) => {
+            log.entries.forEach((entry) => {
+              terminal.write(new Uint8Array(decodeBase64(entry.data)))
+            })
+          })
+        }
+
+        const handleSliderChange = (id, e) => {
+          const position = parseInt(e.target.value, 10)
+          setLogPositions((prev) => ({ ...prev, [id]: position }))
+          replayLogs(id, position)
+        }
+
+        const handleCloseLogs = (id) => {
+          setVisibleTerminals((prev) => ({ ...prev, [id]: false }))
+        }
+
+        return html`
+          <div>
+            <div class="header">
+              <h1>Remote Tasks</h1>
+              <button onClick=${fetchTasks}>Refresh</button>
+            </div>
+            <form onSubmit=${handleSubmit}>
+              <input
+                type="text"
+                id="new-task-tag"
+                placeholder="Tag"
+                list="tag-suggestions"
+                value=${newTaskTag}
+                onChange=${handleInputChange}
+                required />
+              <datalist id="tag-suggestions">
+                ${tagSuggestions.map((tag) => html`<option value=${tag} />`)}
+              </datalist>
+              <input
+                type="text"
+                id="new-task-command"
+                placeholder="Command"
+                list="command-suggestions"
+                value=${newTaskCommand}
+                onChange=${handleInputChange}
+                required />
+              <datalist id="command-suggestions">
+                ${commandSuggestions.map((command) => html`<option value=${command} />`)}
+              </datalist>
+              <button type="submit">Add Task</button>
+            </form>
+            <ul id="task-list">
+              ${tasks.map((item) => {
+                const { id, tag, task, status } = item
+                const { command, exitCode } = JSON.parse(task)
+                const header = `#${id} [${tag}, ${status}${
+                  exitCode !== null ? ` with exit code ${exitCode}` : ''
+                }]`
+                return html`
+                  <li key=${id}>
+                    <div class="task-header">${header}</div>
+                    <div class="task-content">
+                      <div>${command.join(' ')}</div>
+                      ${status === 'done' &&
+                      html` <button onClick=${() => handleRequeue(id)}>Requeue</button> `}
+                      ${status !== 'pending' &&
+                      html` <button onClick=${() => handleShowLogs(id)}>Logs</button>`}
+                      <button onClick=${() => handleDelete(id)}>Delete</button>
+                    </div>
+                    <div
+                      class="log-container"
+                      style=${{
+                        display: visibleTerminals[id] ? 'block' : 'none',
+                      }}>
+                      <div class="log-header">
+                        <input
+                          type="range"
+                          min="0"
+                          max=${logLengths[id] ?? 0}
+                          value=${logPositions[id] ?? 0}
+                          class="log-slider"
+                          onInput=${(e) => handleSliderChange(id, e)} />
+                        <button onClick=${() => handleCloseLogs(id)}>Close</button>
+                      </div>
+                      <div id="terminal-${id}" class="log-terminal"></div>
+                    </div>
+                  </li>
+                `
+              })}
+            </ul>
+          </div>
+        `
+      }
+
+      render(html`<${App} />`, document.getElementById('app'))
+    </script>
+  </body>
+</html>
