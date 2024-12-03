@@ -1,4 +1,4 @@
-<!-- TODO: Translation -->
+<br>
 <div align="center">
   <h1>Remote Tasks</h1>
   <p>A simple way to execute tasks on remote machines</p>
